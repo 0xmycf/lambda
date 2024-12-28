@@ -1,0 +1,11 @@
+(executable
+ (public_name helloworld)
+ (name main)
+ (flags (:standard -warn-error -A))
+ (modules main parser lexer ast)
+ (libraries menhirLib))
+
+(ocamllex lexer)
+
+(menhir
+ (modules parser))

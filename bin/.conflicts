@@ -1,0 +1,94 @@
+
+** Conflict (shift/reduce) in state 22.
+** Token involved: R_PAREN
+** This state is reached from term after reading:
+
+L_PAREN value
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+term 
+lam_term EOF 
+(?)
+
+** In state 22, looking ahead at R_PAREN, reducing production
+** lam_term -> value
+** is permitted because of the following sub-derivation:
+
+app 
+hd lam_term 
+L_PAREN lam_term R_PAREN // lookahead token appears
+        value . 
+
+** In state 22, looking ahead at R_PAREN, shifting is permitted
+** because of the following sub-derivation:
+
+value 
+L_PAREN value . R_PAREN 
+
+** Conflict (shift/reduce) in state 12.
+** Tokens involved: TIMES PLUS MINUS DIV
+** The following explanations concentrate on token TIMES.
+** This state is reached from term after reading:
+
+hd lam_term
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+term 
+lam_term EOF 
+(?)
+
+** In state 12, looking ahead at TIMES, reducing production
+** app -> hd lam_term
+** is permitted because of the following sub-derivation:
+
+value 
+arith 
+lam_term TIMES lam_term // lookahead token appears
+app // lookahead token is inherited
+hd lam_term . 
+
+** In state 12, looking ahead at TIMES, shifting is permitted
+** because of the following sub-derivation:
+
+app 
+hd lam_term 
+   value 
+   arith 
+   lam_term . TIMES lam_term 
+
+** Conflict (shift/reduce) in state 8.
+** Tokens involved: TIMES PLUS MINUS DIV
+** The following explanations concentrate on token TIMES.
+** This state is reached from term after reading:
+
+LAMBDA LIT DOT lam_term
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+term 
+lam_term EOF 
+(?)
+
+** In state 8, looking ahead at TIMES, shifting is permitted
+** because of the following sub-derivation:
+
+fn 
+LAMBDA LIT DOT lam_term 
+               value 
+               arith 
+               lam_term . TIMES lam_term 
+
+** In state 8, looking ahead at TIMES, reducing production
+** fn -> LAMBDA LIT DOT lam_term
+** is permitted because of the following sub-derivation:
+
+value 
+arith 
+lam_term TIMES lam_term // lookahead token appears
+fn // lookahead token is inherited
+LAMBDA LIT DOT lam_term . 
