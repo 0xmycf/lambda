@@ -15,7 +15,7 @@
 
 %token EOF
 
-%nonassoc LAMBODY (* ig this works ? *)
+%nonassoc LAMBODY
 %left PLUS MINUS
 %left TIMES DIV
 %left APP
@@ -41,14 +41,14 @@ value:
     ;
 
 lam_term:
-    | "("; lt = lam_term; ")"
-        { lt }
+    | "("; lam_term; ")" 
+        { $2 }
+    | x = app 
+        { x }
     | v = value
         { v }
     | f = fn 
         { f }
-    | x = app 
-        { x }
     ;
 
 fn:
@@ -68,27 +68,13 @@ hd:
         { lt }
     ;
 
-/*
-    This leads to ambiguity
-
-    \ x . x + x
-
-    is what?
-
-    (\x . x) + x
-
-    or 
-
-    (\x . x + x)
-*/
-
 arith:
-    | t1 = lam_term; MINUS; t2 = lam_term
-        { BinOp (t1, Minus, t2) }
-    | t1 = lam_term; PLUS; t2 = lam_term
-        { BinOp (t1, Plus, t2) }
-    | t1 = lam_term; TIMES; t2 = lam_term
-        { BinOp (t1, Times, t2) }
-    | t1 = lam_term; DIV; t2 = lam_term
-        { BinOp (t1, Div, t2) }
+    | t1 = lam_term; op; t2 = lam_term 
+        { BinOp (t1, $2, t2) }
     ;
+
+%inline op:
+    | MINUS { Minus }
+    | PLUS  { Plus }
+    | TIMES { Times }
+    | DIV   { Div }
