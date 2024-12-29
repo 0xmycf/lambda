@@ -18,6 +18,7 @@
 %nonassoc LAMBODY
 %left PLUS MINUS
 %left TIMES DIV
+%nonassoc LIT, L_PAREN, INT, LAMBDA
 %left APP
 
 %start term
@@ -43,7 +44,7 @@ value:
 lam_term:
     | "("; lam_term; ")" 
         { $2 }
-    | x = app 
+    | x = app
         { x }
     | v = value
         { v }
@@ -57,15 +58,8 @@ fn:
     ;
 
 app:
-    | hd = hd; u = lam_term
+    | hd = lam_term; u = lam_term
         { App (hd, u) } %prec APP
-    ;
-
-hd:
-    | x = LIT
-        { Lit x }
-    | "("; lt = lam_term; ")"
-        { lt }
     ;
 
 arith:

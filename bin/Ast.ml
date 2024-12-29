@@ -21,7 +21,7 @@ let show_op = function
 let rec show_term t =
   match t with
   | Lit str -> str
-  | App (t, s) -> show_term t ^ "" ^ show_term s
+  | App (t, s) -> show_term t ^ "<" ^ show_term s ^ ">"
   | Lam (s, t) -> "(λ" ^ s ^ "." ^ show_term t ^ ")"
   | IntLit i -> string_of_int i
   | BinOp (t1, op, t2) -> "( " ^ show_term t1 ^ " " ^ show_op op ^ " " ^ show_term t2 ^ " )"
