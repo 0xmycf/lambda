@@ -1,9 +1,13 @@
 type term =
   | Lit of string
+  | Bexp of bool
+  | IntLit of int
   | Lam of string * term
   | App of term * term
-  | IntLit of int
   | BinOp of term * op * term
+  | Decl of string * term
+  (* | LetIn of string * term * term *)
+  | If of term * term * term
 
 and op =
   | Plus
@@ -18,30 +22,22 @@ let show_op = function
   | Div -> "/"
 ;;
 
-let rec show_term t =
-  match t with
-  | Lit str -> str
-  | App (t, s) -> show_term t ^ "<" ^ show_term s ^ ">"
-  | Lam (s, t) -> "(λ" ^ s ^ "." ^ show_term t ^ ")"
-  | IntLit i -> string_of_int i
-  | BinOp (t1, op, t2) -> "( " ^ show_term t1 ^ " " ^ show_op op ^ " " ^ show_term t2 ^ " )"
+let fn_of_op = function
+  | Plus -> ( + )
+  | Times -> ( * )
+  | Minus -> ( - )
+  | Div -> ( / )
 ;;
 
-module StringSet = Set.Make (String)
-
-(*
-   α-equivalence (not a good implementation)
-*)
-let rec alpha n = alpha_intern true StringSet.empty n
-
-and alpha_intern bl bound_vars n = function
-  | Lit s when StringSet.mem s bound_vars
-      -> Lit n
-  | Lam (arg, body) when not bl (* when the bool is false, we should not change argnames anymore *)
-      -> Lam (arg, alpha_intern bl bound_vars n body)
-  | Lam (arg, body) when arg != n && not (StringSet.mem arg bound_vars) 
-      -> Lam (n, alpha_intern false (StringSet.add arg bound_vars) n body)
-  | App (fn, arg) 
-      -> App (alpha_intern bl bound_vars n fn, alpha_intern bl bound_vars n arg)
-  | t -> t
-  [@@ocamlformat "disable"]
+let rec show_term t =
+  match t with
+  | Lit str            -> str
+  | App (t, s)         -> "(" ^ show_term t ^ "<" ^ show_term s ^ ">)"
+  | Lam (s, t)         -> "(λ" ^ s ^ "." ^ show_term t ^ ")"
+  | IntLit i           -> string_of_int i
+  | BinOp (t1, op, t2) -> "( " ^ show_term t1 ^ " " ^ show_op op ^ " " ^ show_term t2 ^ " )"
+  | Decl (name, t)     -> "let " ^ name ^ " = " ^ show_term t
+  (* | LetIn (name, t, e) -> "let " ^ name ^ " = " ^ show_term t ^ " in " ^ show_term e *)
+  | If (bexp, t, f)    -> "if " ^ show_term bexp ^ " then " ^ show_term t ^ " else " ^ show_term f
+  | Bexp bl            -> string_of_bool bl
+ [@@ocamlformat "disable"]

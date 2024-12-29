@@ -1,9 +1,13 @@
 type term =
   | Lit of string
+  | Bexp of bool
+  | IntLit of int
   | Lam of string * term
   | App of term * term
-  | IntLit of int
   | BinOp of term * op * term
+  | Decl of string * term
+  (* | LetIn of string * term * term *)
+  | If of term * term * term
 
 and op =
   | Plus
@@ -12,8 +16,4 @@ and op =
   | Div
 
 val show_term : term -> string
-
-(*
-   α-equivalence
-*)
-val alpha : string -> term -> term
+val fn_of_op : op -> int -> int -> int

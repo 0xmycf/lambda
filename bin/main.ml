@@ -14,15 +14,17 @@ let show_token t =
   | MINUS -> "MINUS"
   | TIMES -> "TIMES"
   | DIV -> "DIV"
+  | _ -> failwith "not implemented"
 ;;
 
 let rec loop lexer =
   try
     flush stdout;
     let _ =
-      match Parser.term Lexer.read lexer with
-      | Some t -> Printf.printf "%s\n\n" (show_term t)
-      | None -> ()
+      match Parser.module_ Lexer.read lexer with
+      | ls -> List.iteri (fun i a -> Printf.printf "%i: %s\n" i (show_term a)) ls
+      (* | Some t -> Printf.printf "%s\n\n" (show_term t) *)
+      (* | None -> () *)
     in
     loop lexer
   with

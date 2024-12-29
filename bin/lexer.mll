@@ -33,24 +33,32 @@ let lambda = "lambda" | "\\" | "λ"
 
 rule read =
   parse
-  | eof      { EOF }
-  | newline  { next_line lexbuf; read lexbuf }
-  | white    { read lexbuf }
-  | lambda   { LAMBDA }
-  | id       { LIT (Lexing.lexeme lexbuf) }
-  | int      { INT (int_of_string (Lexing.lexeme lexbuf))}
-  | binop    { match (Lexing.lexeme lexbuf) with 
-                | "*" -> TIMES
-                | "+" -> PLUS
-                | "-" -> MINUS
-                | "/" -> DIV
-                | _ -> raise UnmatchedBinOp
-             }
-  | dot      { DOT }
-  | '('      { L_PAREN }
-  | ')'      { R_PAREN }
+  | eof           { EOF }
+  | newline       { next_line lexbuf; read lexbuf }
+  | white         { read lexbuf }
+  | lambda        { LAMBDA }
+  | "let"         { LET }
+  | "="           { EQUAL }
+  | "in"          { IN }
+  | "true"        { TRUE }
+  | "false"       { FALSE }
+  | "if"          { IF }
+  | "then"        { THEN }
+  | "else"        { ELSE }
+  | id            { LIT (Lexing.lexeme lexbuf) }
+  | int           { INT (int_of_string (Lexing.lexeme lexbuf))}
+  | binop         { match (Lexing.lexeme lexbuf) with 
+                        | "*" -> TIMES
+                        | "+" -> PLUS
+                        | "-" -> MINUS
+                        | "/" -> DIV
+                        | _ -> raise UnmatchedBinOp
+                     }
+  | dot           { DOT }
+  | '('           { L_PAREN }
+  | ')'           { R_PAREN }
   | upcaseID
-    { raise (SyntaxError "identifiers must start with a lower case letter (not uppercase)")}
+                  { raise (SyntaxError "identifiers must start with a lower case letter (not uppercase)")}
   | numberID
-    { raise (SyntaxError "identifiers must start with a lower case letter (not a number)")}
-  (* | _ { raise (SyntaxError ( "Unexpected syntax " ^ Lexing.lexeme lexbuf )) } *)
+                  { raise (SyntaxError "identifiers must start with a lower case letter (not a number)")}
+  (* | _          { raise (SyntaxError ( "Unexpected syntax " ^ Lexing.lexeme lexbuf )) } *)
