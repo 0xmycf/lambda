@@ -6,7 +6,7 @@
 %token <string> LIT
 %token L_PAREN          "("
 %token R_PAREN          ")"
-%token LAMBDA           "lam" (* or "λ" or "\\" *)
+%token LAMBDA           "λ" (* or "λ" or "\\" *)
 %token DOT              "."
 
 %token <int>INT        "-1" (* example *)
@@ -15,14 +15,20 @@
 
 %token EOF
 
-%nonassoc LAMBODY
+%nonassoc LAMBODY /* the body of a lambda should always include everything  */
+/* PEMDAS */
 %left PLUS MINUS
 %left TIMES DIV
-%nonassoc LIT, L_PAREN, INT, LAMBDA
+
+/*
+    ensures that f a b is parsed as f<a><b> and not f<a<b>>
+*/
+%nonassoc LIT, L_PAREN, INT, LAMBDA /* list every token that can start an expression see: https://ptival.github.io/2017/05/16/parser-generators-and-function-application/ */
 %left APP
 
 %start term
 %type <Ast.term option> term
+
 %%
 
 term: 
@@ -33,27 +39,20 @@ term:
     ;
 
 value:
-    | x = LIT 
-        { Lit x }
-    | i = INT
-        { IntLit i }
-    | a_expr = arith
-        { a_expr }
+    | LIT   { Lit $1 }
+    | INT   { IntLit $1 }
+    | arith { $1 }
     ;
 
 lam_term:
-    | "("; lam_term; ")" 
-        { $2 }
-    | x = app
-        { x }
-    | v = value
-        { v }
-    | f = fn 
-        { f }
+    | "("; lam_term; ")" { $2 }
+    | app                { $1 }
+    | value              { $1 }
+    | fn                 { $1 }
     ;
 
 fn:
-    | LAMBDA; i = LIT; "."; t = lam_term
+    | "λ"; i = LIT; "."; t = lam_term
         { Lam (i, t) } %prec LAMBODY
     ;
 
