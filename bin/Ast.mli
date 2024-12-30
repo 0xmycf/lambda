@@ -6,7 +6,7 @@ type term =
   | App of term * term
   | BinOp of term * op * term
   | Decl of string * term
-  (* | LetIn of string * term * term *)
+  | LetIn of string * term * term
   | If of term * term * term
 
 and op =

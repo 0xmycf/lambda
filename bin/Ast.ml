@@ -6,7 +6,7 @@ type term =
   | App of term * term
   | BinOp of term * op * term
   | Decl of string * term
-  (* | LetIn of string * term * term *)
+  | LetIn of string * term * term
   | If of term * term * term
 
 and op =
@@ -37,7 +37,7 @@ let rec show_term t =
   | IntLit i           -> string_of_int i
   | BinOp (t1, op, t2) -> "( " ^ show_term t1 ^ " " ^ show_op op ^ " " ^ show_term t2 ^ " )"
   | Decl (name, t)     -> "let " ^ name ^ " = " ^ show_term t
-  (* | LetIn (name, t, e) -> "let " ^ name ^ " = " ^ show_term t ^ " in " ^ show_term e *)
+  | LetIn (name, t, e) -> "[let " ^ name ^ " = " ^ show_term t ^ " in " ^ show_term e ^ "]"
   | If (bexp, t, f)    -> "if " ^ show_term bexp ^ " then " ^ show_term t ^ " else " ^ show_term f
   | Bexp bl            -> string_of_bool bl
  [@@ocamlformat "disable"]

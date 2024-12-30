@@ -2,7 +2,8 @@
  (public_name helloworld)
  (name main)
  (flags (:standard -warn-error -A))
- (modules main parser lexer ast)
+ (modules main ast parser lexer typechecker)
+ (preprocess (pps ppx_compare))
  (libraries menhirLib))
 
 (ocamllex lexer)

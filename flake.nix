@@ -30,10 +30,11 @@
               ocamlformat
               findlib
 
-              # utop
+              utop
 
               menhir
               menhirLib
+              ppx_compare
 
             ]);
         };

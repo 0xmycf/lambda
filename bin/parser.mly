@@ -22,10 +22,11 @@
 
 %nonassoc LAMBODY /* the body of a lambda should always include everything */
 
+
 %nonassoc IN (* keep this here, this parses let expressions correctly for some reason *)
 
 (* inlcude ELSE why ? (nested if???) *)
-%nonassoc LIT, L_PAREN, INT, LAMBDA, TRUE, FALSE, IF, LET, (* IN, *) ELSE, EQUAL
+%nonassoc LIT, L_PAREN, INT, LAMBDA, TRUE, FALSE, IF, LET, ELSE, EQUAL
 
 
 /* PEMDAS */
@@ -91,7 +92,9 @@ ifte:
 */
 let_expr:
     | "let"; name = LIT; "="; t = lam_term; "in"; e = lam_term
-        { App (Lam (name, e), t) } (* %prec LET_IN *)
+        (* sadly this is not compatible with typed lambda calculus und HM-type inference *)
+        (* { App (Lam (name, e), t) } (* %prec LET_IN *) *)
+        { LetIn (name, t, e)}
     ;
 
 /* let ident = _ 
