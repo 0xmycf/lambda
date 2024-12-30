@@ -1,6 +1,3 @@
-(* example for erronous input
-    \x . if x then let not = \y . if y then false else true in not x else true
-*)
 open Ast
 
 let show_token t =
