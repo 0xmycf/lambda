@@ -82,15 +82,17 @@ let string_of_opt = function
   | Some x -> "Some " ^ x
 ;;
 
+let print_ast terms =
+  List.iter (fun t -> Printf.printf "%s\n" (Ast.show_term t)) terms;
+  print_newline ()
+;;
+
 let () =
-  let chan = In_channel.open_bin "./test/module.lambda" in
+  let file = Sys.argv.(1) in
+  let chan = In_channel.open_bin file in
   let lex = Lexing.from_channel chan in
   try
     let terms = Parser.module_ Lexer.read lex in
-    let () =
-      List.iter (fun t -> Printf.printf "%s\n" (Ast.show_term t)) terms;
-      print_newline ()
-    in
     let module Tc = Typechecker.TC_types in
     let module Solver = Typechecker.TC_types.Solver in
     let i = new Tc.infer Tc.SMap.empty in
