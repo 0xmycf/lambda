@@ -61,7 +61,7 @@ let show_token t =
 let string_of_tc_error e =
   let module Tc = Typechecker.TC_types in
   let open Printf in
-  match e with
+  "error: " ^ match e with
   | Tc.Type_mismatch (_a, _b) ->
     sprintf "Type mismtach between \n(got)\t%s\n(need)\t%s\n" _a _b
   | Tc.Infinite_type _a -> sprintf "Cannot construct infinite type %s" _a

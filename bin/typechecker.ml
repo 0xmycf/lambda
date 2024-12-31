@@ -148,6 +148,13 @@ module TC_types = struct
 
       (* similar to local in the Reader Monad *)
       method copy_with fn = new infer ~ii:i ~cc:c (fn context)
+
+      method private run_with_copy fn arg =
+        let copy = self#copy_with fn in
+        let t0 = copy#infer_private arg in
+        self#update copy;
+        t0
+
       method get_i_c = i, c
 
       method update (other : infer) =
@@ -192,10 +199,7 @@ module TC_types = struct
         | Lam (str, t) ->
           let arg = self#fresh in
           let ps = TypeSet.empty, arg in
-          let copy = self#copy_with (SMap.add str ps) in
-          let body = copy#infer_private t in
-          self#update copy;
-          (* we make an actual copy so we need to keep the changes? *)
+          let body = self#run_with_copy (SMap.add str ps) t in
           Typ ("lambda", [ arg; body ])
         | App (t0, t1) ->
           let applicant = self#infer_private t0 in
@@ -214,17 +218,13 @@ module TC_types = struct
           (* generalize -after- infer_private *)
           let name = self#fresh in
           let ps = TypeSet.empty, name in
-          let copy = self#copy_with (SMap.add str ps) in
-          let decl_body = copy#infer_private t0 in
-          self#update copy;
+          let decl_body = self#run_with_copy (SMap.add str ps) t0 in
           self#constraint_ name decl_body;
           decl_body
         | LetIn (str, t0, t1) ->
           let rhs = self#infer_private t0 in
           let gen = self#generalize rhs in
-          let copy = self#copy_with (SMap.add str gen) in
-          let expr_body = copy#infer_private t1 in
-          self#update copy;
+          let expr_body = self#run_with_copy (SMap.add str gen) t1 in
           expr_body
         | If (bexp, t0, t1) ->
           let if_ = self#infer_private bexp in
@@ -306,9 +306,35 @@ module TC_types = struct
         Right (i#generalize infer_type)
     ;;
 
+    let modify_infer_decl : infer -> Ast.term -> polytype -> infer =
+      fun infer t typ ->
+      match t with
+      | Decl (name, _) -> infer#copy_with (SMap.add name typ)
+      | _ -> infer
+    ;;
+
+    let ( >>= ) e f =
+      let open Either in
+      match e with
+      | Left err -> Left err
+      | Right v -> f v
+    ;;
+
     let run_infer_module : infer -> Ast.term list -> polytype solve list =
-      fun i decls -> 
-        List.rev @@ List.fold_left (fun acc v -> run_infer i v :: acc) [] decls
+      fun i decls ->
+      let ref_i = ref i in
+      let open Either in
+      List.rev
+      @@ List.fold_left
+           (fun acc v ->
+              ((try run_infer !ref_i v with
+                | HM_exn err -> Left err)
+               >>= fun t ->
+               ref_i := modify_infer_decl !ref_i v t;
+               Right t)
+              :: acc)
+           []
+           decls
     ;;
   end
 end
