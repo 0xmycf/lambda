@@ -2,7 +2,7 @@
  (public_name lambda)
  (name main)
  (flags (:standard -warn-error -A))
- (modules main ast parser parser_messages lexer typechecker)
+ (modules main ast parser parser_messages lexer typechecker interpreter)
  (preprocess (pps ppx_compare))
  (libraries menhirLib))
 

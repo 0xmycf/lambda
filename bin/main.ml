@@ -61,7 +61,9 @@ let show_token t =
 let string_of_tc_error e =
   let module Tc = Typechecker.TC_types in
   let open Printf in
-  "error: " ^ match e with
+  "error: "
+  ^
+  match e with
   | Tc.Type_mismatch (_a, _b) ->
     sprintf "Type mismtach between \n(got)\t%s\n(need)\t%s\n" _a _b
   | Tc.Infinite_type _a -> sprintf "Cannot construct infinite type %s" _a
@@ -73,6 +75,11 @@ let string_of_polytype_solve =
   function
   | Left (err : Typechecker.TC_types.typecheck_error) -> string_of_tc_error err
   | Right poly -> Typechecker.TC_types.string_of_polytype poly
+;;
+
+let string_of_opt = function
+  | None -> "None"
+  | Some x -> "Some " ^ x
 ;;
 
 let () =
@@ -87,10 +94,20 @@ let () =
     let module Tc = Typechecker.TC_types in
     let module Solver = Typechecker.TC_types.Solver in
     let i = new Tc.infer Tc.SMap.empty in
-    let foo = Solver.run_infer_module i terms in
-    List.iter (fun x -> print_endline @@ string_of_polytype_solve x) foo
+    let checks = Solver.run_infer_module i terms in
+    if List.for_all Either.is_right checks
+    then
+      print_endline
+      @@ string_of_opt
+      @@ Option.map
+           Ast.show_term
+           Interpreter.(
+             let final = reduce_module terms in
+             StringMap.find_opt "main" final)
+    else List.iter (fun x -> print_endline @@ string_of_polytype_solve x) checks
   with
-  | Parser.Error i -> Printf.printf "Parse Error on input:(%i)%s\n" i (Parser_messages.message i)
+  | Parser.Error i ->
+    Printf.printf "Parse Error on input:(%i)%s\n" i (Parser_messages.message i)
   | Typechecker.TC_types.HM_exn e ->
     let module Tc = Typechecker.TC_types in
     let () = Printf.printf "(caught exn)\n\t" in

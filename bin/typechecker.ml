@@ -120,7 +120,7 @@ module TC_types = struct
       | hd0 :: tl0, hd1 :: tl1 -> (hd0, hd1) :: zip tl0 tl1
     ;;
 
-    let rec apply_constraint : subst -> constraint_ -> constraint_ =
+    let apply_constraint : subst -> constraint_ -> constraint_ =
       fun s (c1, c2) -> apply s c1, apply s c2
     ;;
 

@@ -4,8 +4,10 @@ let x = 10
 
 let y = true
 
-let z = \x . if y then x else (10 * 2) / 5
+let z = \arg . if arg then x else (10 * 2) / 5
 
 let s_comb = \a. \b. \c . a c (b c)
 
+
+let main = z y + x
 

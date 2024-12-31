@@ -1,3 +1,9 @@
+type op =
+  | Plus
+  | Minus
+  | Times
+  | Div
+
 type term =
   | Lit of string
   | Bexp of bool
@@ -8,12 +14,6 @@ type term =
   | Decl of string * term
   | LetIn of string * term * term
   | If of term * term * term
-
-and op =
-  | Plus
-  | Minus
-  | Times
-  | Div
 
 let show_op = function
   | Plus -> "+"
