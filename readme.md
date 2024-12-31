@@ -15,8 +15,10 @@ It currently features:
 It does not actually do anything though.
 Just parsing and typechecking.
 
-The interpreter shouldn't be complicated though, 
-  so thats what I'll implement next.
+~~The interpreter shouldn't be complicated though, 
+  so thats what I'll implement next.n~~
+
+The [Interpreter](https://github.com/0xmycf/lambda/blob/main/bin/interpreter.ml) exists now.
 
 ---
 
