@@ -31,3 +31,10 @@ _opam/
 
 # lexer and parser
 bin/lexer.ml
+bin/lexer.mli
+
+bin/parser.ml
+bin/parser.mli
+
+parser.messages
+bin/parser_messages.ml

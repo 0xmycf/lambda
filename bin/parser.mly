@@ -9,7 +9,7 @@
 %token LAMBDA           "λ" (* or "λ" or "\\" *)
 %token DOT              "."
 
-/* assginment */
+/* assignment */
 %token LET "let", EQUAL "=", IN "in"
 /* conditional */
 %token IF "if", THEN "then", ELSE "else", TRUE "true", FALSE "false"
@@ -20,13 +20,19 @@
 
 %token EOF
 
+/* list every token that can start an expression see: https://ptival.github.io/2017/05/16/parser-generators-and-function-application/ */
+
+
+
+%left LET
+
 %nonassoc LAMBODY /* the body of a lambda should always include everything */
 
+%left IN
 
-%nonassoc IN (* keep this here, this parses let expressions correctly for some reason *)
-
-(* inlcude ELSE why ? (nested if???) *)
-%nonassoc LIT, L_PAREN, INT, LAMBDA, TRUE, FALSE, IF, LET, ELSE, EQUAL
+%nonassoc LIT, INT, TRUE, FALSE, EQUAL
+%right LAMBDA
+%left L_PAREN, IF, ELSE
 
 
 /* PEMDAS */
@@ -36,11 +42,10 @@
 /*
     ensures that f a b is parsed as f<a><b> and not f<a<b>>
 */
- /* list every token that can start an expression see: https://ptival.github.io/2017/05/16/parser-generators-and-function-application/ */
 %left APP
 
-%start term
-%type <Ast.term option> term
+(* %start term *)
+(* %type <Ast.term option> term *)
 
 %start module_
 %type <Ast.term list> module_
@@ -50,12 +55,12 @@
 module_:
     | list(assign); EOF { $1 }
 
-term: 
-    | lt = lam_term; EOF
-        { Some lt }
-    | EOF 
-        { None }
-    ;
+(* term:  *)
+(*     | lt = lam_term; EOF *)
+(*         { Some lt } *)
+(*     | EOF  *)
+(*         { None } *)
+(*     ; *)
 
 value:
     | LIT                { Lit $1 }
@@ -102,7 +107,7 @@ let_expr:
    i.e. a top-level declaration
 */
 assign: 
-    | "let"; l = LIT; "="; t = lam_term
+    | "let"; l = LIT; "="; t = lam_term %prec LET
         { Decl (l, t) }
     ;
 
@@ -113,8 +118,8 @@ lam_term:
     ;
 
 fn:
-    | "λ"; i = LIT; "."; t = lam_term
-        { Lam (i, t) } %prec LAMBODY
+    | "λ"; i = LIT; "."; t = lam_term %prec LAMBODY
+        { Lam (i, t) } 
     ;
 
 app:

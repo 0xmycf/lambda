@@ -34,9 +34,10 @@ module LType = struct
 
   let rec string_of_ltype = function
     | Typ (s, []) -> s
-    (* | Typ ("lambda", [a;b]) -> "(" ^ string_of_ltype a ^ " -> " ^ string_of_ltype b ^ ")" *)
+    | Typ ("lambda", [ a; b ]) ->
+      "(" ^ string_of_ltype a ^ " -> " ^ string_of_ltype b ^ ")"
     | Typ (s, ts) ->
-        let sfied = List.map string_of_ltype ts in
+      let sfied = List.map string_of_ltype ts in
       s ^ "<" ^ String.concat ", " sfied ^ ">"
     | TypVar v -> string_of_ltypevar v
   ;;
@@ -71,6 +72,17 @@ module TC_types = struct
   *)
   type polytype = TypeSet.t * ltype
 
+  let string_of_polytype ((s, l) : polytype) : string =
+    let as_list = TypeSet.to_list s in
+    let forall = String.concat " " @@ List.map string_of_ltypevar as_list in
+    let prefix =
+      match forall with
+      | "" -> ""
+      | s -> "∀ " ^ s ^ ". "
+    in
+    prefix ^ string_of_ltype l
+  ;;
+
   module SMap = Map.Make (String)
   module TypeMap = Map.Make (CompareTypeVar)
 
@@ -88,14 +100,6 @@ module TC_types = struct
     let module TS = TypeSet in
     let values = Seq.map (fun (_, b) -> b) (SMap.to_seq ctx) in
     Seq.fold_left (fun acc v -> TS.union (tvs_polytype v) acc) TS.empty values
-  ;;
-
-  let generalize : context -> ltype -> polytype =
-    fun ctx typ ->
-    let free_t = tvs typ in
-    let free_ctx = tvs_context ctx in
-    let ( /- ) = TypeSet.diff in
-    free_t /- free_ctx, typ
   ;;
 
   let rec apply : subst -> ltype -> ltype =
@@ -145,7 +149,6 @@ module TC_types = struct
       (* similar to local in the Reader Monad *)
       method copy_with fn = new infer ~ii:i ~cc:c (fn context)
       method get_i_c = i, c
-      method get_meta = c, ctx
 
       method update (other : infer) =
         let ni, nc = other#get_i_c in
@@ -157,16 +160,27 @@ module TC_types = struct
         i <- i + 1;
         TypVar { name = "t" ^ string_of_int x }
 
+      method generalize : ltype -> polytype =
+        fun typ ->
+          let free_t = tvs typ in
+          let free_ctx = tvs_context ctx in
+          let ( /- ) = TypeSet.diff in
+          free_t /- free_ctx, typ
+
       method instantiate ((bound, t) : polytype) : ltype =
         let as_seq = TypeSet.to_seq bound in
         let vars = Seq.map (fun _ -> self#fresh) as_seq in
         let subst = TypeMap.of_list (zip (List.of_seq as_seq) (List.of_seq vars)) in
         apply subst t
 
+      method infer ast : ltype * constraints =
+        let t = self#infer_private ast in
+        t, c
+
       (*
          Can throw Undefined_variable exn
       *)
-      method infer (ast : Ast.term) : ltype =
+      method infer_private (ast : Ast.term) : ltype =
         let open Ast in
         match ast with
         | Lit name ->
@@ -179,94 +193,122 @@ module TC_types = struct
           let arg = self#fresh in
           let ps = TypeSet.empty, arg in
           let copy = self#copy_with (SMap.add str ps) in
-          let body = copy#infer t in
+          let body = copy#infer_private t in
           self#update copy;
           (* we make an actual copy so we need to keep the changes? *)
           Typ ("lambda", [ arg; body ])
         | App (t0, t1) ->
-          let applicant = self#infer t0 in
-          let arg = self#infer t1 in
+          let applicant = self#infer_private t0 in
+          let arg = self#infer_private t1 in
           let ret = self#fresh in
           self#constraint_ applicant (LType.lambda arg ret);
           ret
         | BinOp (t0, _, t1) ->
           (* op is currently not relevant *)
-          let first = self#infer t0 in
-          let second = self#infer t1 in
+          let first = self#infer_private t0 in
+          let second = self#infer_private t1 in
           let ret = self#fresh in
           self#constraint_ LType.arith_op (lambda first (lambda second ret));
           ret
         | Decl (str, t0) ->
-          (* should this not be generalized? *)
+          (* generalize -after- infer_private *)
           let name = self#fresh in
           let ps = TypeSet.empty, name in
           let copy = self#copy_with (SMap.add str ps) in
-          let decl_body = copy#infer t0 in
+          let decl_body = copy#infer_private t0 in
           self#update copy;
           self#constraint_ name decl_body;
           decl_body
         | LetIn (str, t0, t1) ->
-          let rhs = self#infer t0 in
-          let gen = generalize ctx rhs in
+          let rhs = self#infer_private t0 in
+          let gen = self#generalize rhs in
           let copy = self#copy_with (SMap.add str gen) in
-          let expr_body = copy#infer t1 in
+          let expr_body = copy#infer_private t1 in
           self#update copy;
           expr_body
         | If (bexp, t0, t1) ->
-          let if_ = self#infer bexp in
-          let then_ = self#infer t0 in
-          let else_ = self#infer t1 in
+          let if_ = self#infer_private bexp in
+          let then_ = self#infer_private t0 in
+          let else_ = self#infer_private t1 in
           self#constraint_ if_ type_bool;
           self#constraint_ then_ else_;
           then_
+
+      (* method infer_decl t = *)
+      (*   let ret = self#infer t in *)
+      (*   failwith "wip"; *)
+      (*   () *)
     end
 
-  type 'a solve = (typecheck_error, 'a) Either.t
+  module Solver : sig
+    type 'a solve = (typecheck_error, 'a) Either.t
 
-  (*
-     Can fail with Type_mismatch
-  *)
-  let rec unify : ltype -> ltype -> subst solve =
-    fun a b ->
-    match a, b with
-    | a, b when a = b -> Right TypeMap.empty
-    | TypVar tv, t -> bind tv t
-    | t, TypVar tv -> bind tv t
-    (*--------------------------------------------------*)
-    | Typ (n0, _), Typ (n1, _) when n0 != n1 ->
-      Left (Type_mismatch (LType.string_of_ltype a, LType.string_of_ltype b))
-    | Typ (_, rest0), Typ (_, rest1) -> unify_many rest0 rest1
+    val run_solve : constraints -> subst solve
+    val run_infer : infer -> Ast.term -> polytype solve
+    val run_infer_module : infer -> Ast.term list -> polytype solve list
+  end = struct
+    type 'a solve = (typecheck_error, 'a) Either.t
 
-  and unify_many a b =
-    match a, b with
-    | [], [] -> Right TypeMap.empty
-    | hd0 :: tl0, hd1 :: tl1 ->
-      let s1_ = unify hd0 hd1 in
-      (match s1_ with
-       | Left err -> Left err
-       | Right s1 ->
-         let s2_ = unify_many (List.map (apply s1) tl0) (List.map (apply s1) tl1) in
-         (match s2_ with
-          | Left err -> Left err
-          | Right s2 -> Right (compose s2 s1)))
-    | _, _ -> failwith "I dont know what should happen in this case"
+    (*
+       Can fail with Type_mismatch
+    *)
+    let rec unify : ltype -> ltype -> subst solve =
+      fun a b ->
+      match a, b with
+      | a, b when a = b -> Right TypeMap.empty
+      | TypVar tv, t -> bind tv t
+      | t, TypVar tv -> bind tv t
+      (*--------------------------------------------------*)
+      | Typ (n0, _), Typ (n1, _) when n0 != n1 ->
+        Left (Type_mismatch (LType.string_of_ltype a, LType.string_of_ltype b))
+      | Typ (_, rest0), Typ (_, rest1) -> unify_many rest0 rest1
 
-  and bind : ltypevar -> ltype -> subst solve =
-    fun v t ->
-    match TypeSet.find_opt v (tvs t) with
-    | Some x -> Left (Infinite_type (LType.string_of_ltypevar x))
-    | None -> Right (TypeMap.singleton v t)
-  ;;
+    and unify_many a b =
+      match a, b with
+      | [], [] -> Right TypeMap.empty
+      | hd0 :: tl0, hd1 :: tl1 ->
+        let s1_ = unify hd0 hd1 in
+        (match s1_ with
+         | Left err -> Left err
+         | Right s1 ->
+           let s2_ = unify_many (List.map (apply s1) tl0) (List.map (apply s1) tl1) in
+           (match s2_ with
+            | Left err -> Left err
+            | Right s2 -> Right (compose s2 s1)))
+      | _, _ -> failwith "I dont know what should happen in this case"
 
-  let rec solve : subst -> constraints -> subst solve =
-    fun s c ->
-    match c with
-    | [] -> Right s
-    | (c1, c2) :: tl ->
-      (match unify c1 c2 with
-       | Left err -> Left err
-       | Right s1 -> solve (compose s1 s) (List.map (apply_constraint s1) tl))
-  ;;
+    and bind : ltypevar -> ltype -> subst solve =
+      fun v t ->
+      match TypeSet.find_opt v (tvs t) with
+      | Some x -> Left (Infinite_type (LType.string_of_ltypevar x))
+      | None -> Right (TypeMap.singleton v t)
+    ;;
 
-  let run_solve : constraints -> (typecheck_error, subst) Either.t = solve TypeMap.empty
+    let rec solve : subst -> constraints -> subst solve =
+      fun s c ->
+      match c with
+      | [] -> Right s
+      | (c1, c2) :: tl ->
+        (match unify c1 c2 with
+         | Left err -> Left err
+         | Right s1 -> solve (compose s1 s) (List.map (apply_constraint s1) tl))
+    ;;
+
+    let run_solve : constraints -> (typecheck_error, subst) Either.t = solve TypeMap.empty
+
+    let run_infer : infer -> Ast.term -> polytype solve =
+      fun i typ ->
+      let type_, c = i#infer typ in
+      match run_solve c with
+      | Left err -> Left err
+      | Right subst ->
+        let infer_type = apply subst type_ in
+        Right (i#generalize infer_type)
+    ;;
+
+    let run_infer_module : infer -> Ast.term list -> polytype solve list =
+      fun i decls -> 
+        List.rev @@ List.fold_left (fun acc v -> run_infer i v :: acc) [] decls
+    ;;
+  end
 end
