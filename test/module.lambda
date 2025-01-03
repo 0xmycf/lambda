@@ -1,13 +1,29 @@
 
-
 let x = 10
 
-let y = true
+let not = \x . if x then false else true
+
+let y = not false
 
 let z = \arg . if arg then x else (10 * 2) / 5
 
 let s_comb = \a. \b. \c . a c (b c)
 
+let rec = \x . if x then rec false else x
 
-let main = z y + x
+let id = \x . x
 
+let foo = id true
+
+let bar = id 10
+
+let err = \x . let x = x - 10 in \y . x + y
+
+let t = \x. (\y. \x. x) x
+
+let term = 10 / 2
+
+let inf = \x . inf (x + term)
+
+let main =  inf 0
+    

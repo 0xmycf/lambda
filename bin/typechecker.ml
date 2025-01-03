@@ -242,12 +242,14 @@ module TC_types = struct
 
   module Solver : sig
     type 'a solve = (typecheck_error, 'a) Either.t
+    type 'a inferred = (typecheck_error * Ast.term, 'a) Either.t
 
     val run_solve : constraints -> subst solve
-    val run_infer : infer -> Ast.term -> polytype solve
-    val run_infer_module : infer -> Ast.term list -> polytype solve list
+    val run_infer : infer -> Ast.term -> polytype inferred
+    val run_infer_module : infer -> Ast.term list -> (polytype * Ast.term) inferred list
   end = struct
     type 'a solve = (typecheck_error, 'a) Either.t
+    type 'a inferred = (typecheck_error * Ast.term, 'a) Either.t
 
     (*
        Can fail with Type_mismatch
@@ -296,11 +298,11 @@ module TC_types = struct
 
     let run_solve : constraints -> (typecheck_error, subst) Either.t = solve TypeMap.empty
 
-    let run_infer : infer -> Ast.term -> polytype solve =
+    let run_infer : infer -> Ast.term -> polytype inferred =
       fun i typ ->
       let type_, c = i#infer typ in
       match run_solve c with
-      | Left err -> Left err
+      | Left err -> Left (err, typ)
       | Right subst ->
         let infer_type = apply subst type_ in
         Right (i#generalize infer_type)
@@ -320,18 +322,18 @@ module TC_types = struct
       | Right v -> f v
     ;;
 
-    let run_infer_module : infer -> Ast.term list -> polytype solve list =
+    let run_infer_module : infer -> Ast.term list -> (polytype * Ast.term) inferred list =
       fun i decls ->
       let ref_i = ref i in
       let open Either in
       List.rev
       @@ List.fold_left
-           (fun acc v ->
-              ((try run_infer !ref_i v with
-                | HM_exn err -> Left err)
+           (fun acc term ->
+              ((try run_infer !ref_i term with
+                | HM_exn err -> Left (err, term))
                >>= fun t ->
-               ref_i := modify_infer_decl !ref_i v t;
-               Right t)
+               ref_i := modify_infer_decl !ref_i term t;
+               Right (t, term))
               :: acc)
            []
            decls

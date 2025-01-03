@@ -22,9 +22,8 @@
 
 /* list every token that can start an expression see: https://ptival.github.io/2017/05/16/parser-generators-and-function-application/ */
 
-
-
 %left LET
+%left ELSE
 
 %nonassoc LAMBODY /* the body of a lambda should always include everything */
 
@@ -32,7 +31,7 @@
 
 %nonassoc LIT, INT, TRUE, FALSE, EQUAL
 %right LAMBDA
-%left L_PAREN, IF, ELSE
+%left L_PAREN, IF
 
 
 /* PEMDAS */

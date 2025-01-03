@@ -70,11 +70,12 @@ let string_of_tc_error e =
   | Tc.Undefined_variable _a -> sprintf "%s is not defined" _a
 ;;
 
-let string_of_polytype_solve =
+let string_of_polytype_inferred =
   let open Either in
   function
-  | Left (err : Typechecker.TC_types.typecheck_error) -> string_of_tc_error err
-  | Right poly -> Typechecker.TC_types.string_of_polytype poly
+  | Left (err, term) -> string_of_tc_error err ^ "\nIn term:\t" ^ Ast.show_term term
+  | Right (poly, term) ->
+    Ast.show_term term ^ " : " ^ Typechecker.TC_types.string_of_polytype poly
 ;;
 
 let string_of_opt = function
@@ -87,26 +88,15 @@ let print_ast terms =
   print_newline ()
 ;;
 
+let t = ref []
+
 let () =
   let file = Sys.argv.(1) in
   let chan = In_channel.open_bin file in
   let lex = Lexing.from_channel chan in
   try
     let terms = Parser.module_ Lexer.read lex in
-    let module Tc = Typechecker.TC_types in
-    let module Solver = Typechecker.TC_types.Solver in
-    let i = new Tc.infer Tc.SMap.empty in
-    let checks = Solver.run_infer_module i terms in
-    if List.for_all Either.is_right checks
-    then
-      print_endline
-      @@ string_of_opt
-      @@ Option.map
-           Ast.show_term
-           Interpreter.(
-             let final = reduce_module terms in
-             StringMap.find_opt "main" final)
-    else List.iter (fun x -> print_endline @@ string_of_polytype_solve x) checks
+    t := terms
   with
   | Parser.Error i ->
     Printf.printf "Parse Error on input:(%i)%s\n" i (Parser_messages.message i)
@@ -115,3 +105,37 @@ let () =
     let () = Printf.printf "(caught exn)\n\t" in
     print_endline @@ string_of_tc_error e
 ;;
+
+(* let () = *)
+(*   let terms = !t in *)
+(*   print_endline "Now the AST:"; *)
+(*   List.iter (fun x -> print_endline @@ pretty_print_ast x) terms *)
+(* ;; *)
+
+let () =
+  let terms = !t in
+  let module Tc = Typechecker.TC_types in
+  let module Solver = Typechecker.TC_types.Solver in
+  let i = new Tc.infer Tc.SMap.empty in
+  let checks = Solver.run_infer_module i terms in
+  if List.for_all Either.is_right checks
+  then
+    print_endline
+    @@ string_of_opt
+    @@ Option.map
+         Ast.show_term
+         Interpreter.(
+           try
+             let final = reduce_module terms in
+             Option.map
+               (fun term -> reduce final print_endline term)
+               (StringMap.find_opt "main" final)
+           with
+           | Reduce_error s ->
+             print_endline s;
+             exit 1)
+  else List.iter (fun x -> print_endline @@ string_of_polytype_inferred x) checks
+;;
+(* let errs = List.filter Either.is_left checks in *)
+(* List.iter (fun x -> print_endline @@ string_of_polytype_solve x)  errs; *)
+(* print_ast terms *)
