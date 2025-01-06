@@ -1,0 +1,27 @@
+
+let a = if true then true else false
+
+let b = if a then true else false
+
+let c = if b then 100 else -4302
+
+let lam =
+    let id = λ x . x in
+        λx . if x then λx. 1 else id 
+
+let not = λx. if x 
+    then false 
+    else true
+
+let stress = 
+    if not (not ( not ( not ( not ( not a))))) 
+        then not (not a ) 
+        else not a
+
+# let error =
+#     if 10 then true 
+#           else true
+
+# let error_2 = 
+#     if true then -1 
+#             else (λx.λy.x)

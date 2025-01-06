@@ -33,6 +33,7 @@ let lambda = "lambda" | "\\" | "λ"
 
 rule read =
   parse
+  | "#"           { comment lexbuf }
   | eof           { EOF }
   | newline       { next_line lexbuf; read lexbuf }
   | white         { read lexbuf }
@@ -61,4 +62,9 @@ rule read =
                   { raise (SyntaxError "identifiers must start with a lower case letter (not uppercase)")}
   | numberID
                   { raise (SyntaxError "identifiers must start with a lower case letter (not a number)")}
-  (* | _          { raise (SyntaxError ( "Unexpected syntax " ^ Lexing.lexeme lexbuf )) } *)
+  | _          { raise (SyntaxError ( "Unexpected syntax " ^ Lexing.lexeme lexbuf )) }
+
+and comment =
+    parse
+    | newline   { next_line lexbuf; read lexbuf }
+    | _         { comment lexbuf }
