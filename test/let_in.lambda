@@ -1,0 +1,15 @@
+let x0 =
+    let z = 10 in
+    z
+
+let x1 =
+    let z = true in
+    z
+
+let x2 =
+    let z = λ l . l in
+    z
+
+let x3 = λ arg.
+    let z = λ l.l in
+    arg (z true) (z 10)

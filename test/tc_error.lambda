@@ -1,0 +1,11 @@
+
+let x = 10
+let bar = ( (λx.(λy.(y x))) x )
+
+let bar_ = bar λx.x
+
+let main = 
+    let foo = ( (λx.(λy.(y x))) x )
+    in foo 10
+
+let _ = bar 10

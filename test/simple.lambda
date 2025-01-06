@@ -1,0 +1,13 @@
+
+let a = 10
+
+let b = true
+
+let c = lambda x. x
+
+let d_a = a
+
+let d_b = b
+
+let d_c = c
+

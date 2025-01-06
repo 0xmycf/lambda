@@ -5,19 +5,22 @@ type env = term StringMap.t
 
 open struct
   module Smap = StringMap
+  module Sset = Set.Make (String)
 end
 
 exception Reduce_error of string
 
 let fresh =
-  let subs = ref Smap.empty in
+  let subs = ref Sset.empty in
   fun s ->
     let i = ref 0 in
-    let s' = ref s in
-    while Smap.mem !s' !subs do
+    let s' = ref (s ^ string_of_int !i) in
+    while Sset.mem !s' !subs do
       s' := s ^ string_of_int !i;
       incr i
     done;
+    print_endline "called fresh";
+    subs := Sset.add !s' !subs;
     !s'
 ;;
 

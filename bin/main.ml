@@ -58,17 +58,7 @@ let show_token t =
 
 (* let () = loop (Lexing.from_channel stdin) *)
 
-let string_of_tc_error e =
-  let module Tc = Typechecker.TC_types in
-  let open Printf in
-  "error: "
-  ^
-  match e with
-  | Tc.Type_mismatch (_a, _b) ->
-    sprintf "Type mismtach between \n(got)\t%s\n(need)\t%s\n" _a _b
-  | Tc.Infinite_type _a -> sprintf "Cannot construct infinite type %s" _a
-  | Tc.Undefined_variable _a -> sprintf "%s is not defined" _a
-;;
+let string_of_tc_error = Typechecker.string_of_tc_error
 
 let string_of_polytype_inferred =
   let open Either in
@@ -100,7 +90,7 @@ let () =
   with
   | Parser.Error i ->
     Printf.printf "Parse Error on input:(%i)%s\n" i (Parser_messages.message i)
-  | Typechecker.TC_types.HM_exn e ->
+  | Typechecker.HM_exn e ->
     let module Tc = Typechecker.TC_types in
     let () = Printf.printf "(caught exn)\n\t" in
     print_endline @@ string_of_tc_error e
@@ -113,29 +103,68 @@ let () =
 (* ;; *)
 
 let () =
+  print_endline "running new checker";
+  let module W = Typechecker.W in
+  let module Tc = Typechecker in
+  let module Env = Typechecker.Environment in
   let terms = !t in
-  let module Tc = Typechecker.TC_types in
-  let module Solver = Typechecker.TC_types.Solver in
-  let i = new Tc.infer Tc.SMap.empty in
-  let checks = Solver.run_infer_module i terms in
-  if List.for_all Either.is_right checks
-  then
-    print_endline
-    @@ string_of_opt
-    @@ Option.map
-         Ast.show_term
-         Interpreter.(
-           try
-             let final = reduce_module terms in
-             Option.map
-               (fun term -> reduce final print_endline term)
-               (StringMap.find_opt "main" final)
-           with
-           | Reduce_error s ->
-             print_endline s;
-             exit 1)
-  else List.iter (fun x -> print_endline @@ string_of_polytype_inferred x) checks
+  (* let env = Env.empty in *)
+  (* let go t = *)
+  (*   ( (match W.infer t env with *)
+  (*      | exception Tc.HM_exn a -> *)
+  (*        print_endline @@ string_of_tc_error a ^ " in " ^ Ast.show_term t; *)
+  (*        failwith "HM exn" *)
+  (*      | ok -> ok) *)
+  (*   , t ) *)
+  (* in *)
+  let env =
+    try W.infer_many terms with
+    | Failure s ->
+      print_endline s;
+      failwith "HM_exn"
+  in
+  print_newline ();
+  (* let env' = Env.map (fun (_, s) -> W.gen env s) env
+    in *)
+  (* let foo = List.map go terms in *)
+  (* let env = !ref_env in *)
+  List.iter
+    (function 
+      | (Decl (name, _term)) as decl -> begin
+       let tau = Env.find name env in
+       Printf.printf "%s : %s \n" (Ast.show_term decl) (Typechecker.TypeScheme.show tau) end 
+      | _expr ->  print_endline "unsupported top level expression"; failwith ""
+       (* (Tc.TypeScheme.show (W.gen env tau) )*))
+    terms;
+  print_endline
+    "-- DONE ------------------------------------------------------------------------\n"
 ;;
+
+(* let () = *)
+(*   let terms = !t in *)
+(*   let module Tc = Typechecker.TC_types in *)
+(*   let module Solver = Typechecker.TC_types.Solver in *)
+(*   let i = new Tc.infer Tc.SMap.empty in *)
+(*   let checks = Solver.run_infer_module i terms in *)
+(*   if List.for_all Either.is_right checks *)
+(*   then *)
+(*     print_endline *)
+(*     @@ string_of_opt *)
+(*     @@ Option.map *)
+(*          Ast.show_term *)
+(*          Interpreter.( *)
+(*            try *)
+(*              let final = reduce_module terms in *)
+(*              Option.map *)
+(*                (fun term -> reduce final print_endline term) *)
+(*                (StringMap.find_opt "main" final) *)
+(*            with *)
+(*            | Reduce_error s -> *)
+(*              print_endline s; *)
+(*              exit 1) *)
+(*   else List.iter (fun x -> print_endline @@ string_of_polytype_inferred x) checks *)
+(* ;; *)
+
 (* let errs = List.filter Either.is_left checks in *)
 (* List.iter (fun x -> print_endline @@ string_of_polytype_solve x)  errs; *)
 (* print_ast terms *)

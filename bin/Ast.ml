@@ -15,6 +15,9 @@ type term =
   | LetIn of string * term * term
   | If of term * term * term
 
+(* use this instead of term *)
+type t = term
+
 let show_op = function
   | Plus -> "+"
   | Times -> "*"

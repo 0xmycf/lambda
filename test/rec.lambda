@@ -1,0 +1,8 @@
+
+
+let id = λf.f
+let x = lambda z . x 1
+
+let x_1 = lambda z . x_1 1
+let x_2 = lambda z . x_2 z
+

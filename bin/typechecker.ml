@@ -1,3 +1,298 @@
+module Smap = struct
+  include Map.Make (String)
+
+  let find_def key def map =
+    match find_opt key map with
+    | None -> def
+    | Some x -> x
+  ;;
+
+  let string_values f s = List.map (fun (_, b) -> b) @@ to_list (mapi f s)
+  let right_union a b = union (fun _ _ a -> Some a) a b
+  let left_union a b = union (fun _ a _ -> Some a) a b
+end
+
+module Sset = Set.Make (String)
+
+type typecheck_error =
+  | Undefined_variable of string
+  | Type_mismatch of string * string
+  | Infinite_type of string
+
+exception HM_exn of typecheck_error
+
+let string_of_tc_error e =
+  let open Printf in
+  "error: "
+  ^
+  match e with
+  | Type_mismatch (_a, _b) ->
+    sprintf "Type mismtach between \n(got)\t%s\n(need)\t%s\n" _a _b
+  | Infinite_type _a -> sprintf "Cannot construct infinite type %s" _a
+  | Undefined_variable _a -> sprintf "%s is not defined" _a
+;;
+
+module Type = struct
+  type t =
+    | TyVar of string
+    | TyCon of string * t list
+
+  let rec show = function
+    | TyVar name -> "TyVar(" ^ name ^ ")"
+    | TyCon ("lambda", [ a; b ]) -> "(" ^ pretty_show a ^ " -> " ^ pretty_show b ^ ")"
+    | TyCon (name, rest) ->
+      let rest_string = String.concat ", " @@ List.map (fun x -> show x) rest in
+      "TyCon(" ^ name ^ ", [" ^ rest_string ^ "])"
+
+  and pretty_show = function
+    | TyVar name -> name
+    | TyCon ("lambda", _) as l -> show l
+    | TyCon (name, []) -> name
+    | TyCon (name, rest) ->
+      let rest_string = String.concat ", " @@ List.map (fun x -> pretty_show x) rest in
+      name ^ "[" ^ rest_string ^ "]"
+  ;;
+
+  let tyvar x = TyVar ("t" ^ x)
+
+  let rec free = function
+    | TyVar tv -> Sset.singleton tv
+    | TyCon (_, rest) ->
+      List.fold_left (fun acc v -> Sset.union (free v) acc) Sset.empty rest
+  ;;
+
+  type typ = t
+
+  let bool_type = TyCon ("bool", [])
+  let int_type = TyCon ("int", [])
+  let string_type = TyCon ("string", [])
+  let lambda_type a b = TyCon ("lambda", [ a; b ])
+
+  let rec apply sub t =
+    match t with
+    | TyVar ty -> Smap.find_def ty t sub
+    | TyCon (name, rest) -> TyCon (name, List.map (apply sub) rest)
+  ;;
+
+  module Substitution = struct
+    type t = typ Smap.t
+
+    module M = Smap
+
+    let show sub = Show.show show Smap.string_values sub
+
+    (* Left merge *)
+    let merge l r = Smap.union (fun _ a _ -> Some a) l r
+
+    let compose_all ls =
+      List.fold_right (fun acc v -> merge (Smap.map (apply acc) v) acc) ls Smap.empty
+    ;;
+  end
+
+  let rec unify : t -> t -> Substitution.t =
+    fun a b ->
+    match a, b with
+    | a, b when a = b -> Substitution.M.empty
+    | TyVar a, con -> bind a con
+    | con, TyVar b -> bind b con
+    | (TyCon (n1, _) as a), (TyCon (n2, _) as b) when n1 != n2 ->
+      raise (HM_exn (Type_mismatch (show b, show a)))
+    | TyCon (_, typs1), TyCon (_, typs2) ->
+      let open Substitution in
+      List.fold_left2
+        (fun acc l r -> M.right_union (unify (apply acc l) (apply acc r)) acc)
+        M.empty
+        typs1
+        typs2
+
+  and bind tv typ =
+    (* Substitution.M.singleton tv typ *)
+    match Sset.find_opt tv (free typ) with
+    | None -> Substitution.M.singleton tv typ
+    | Some _ -> raise (HM_exn (Infinite_type (show typ)))
+  ;;
+end
+
+module TypeScheme = struct
+  type t = Sset.t * Type.t
+
+  let show scheme =
+    let values = Sset.fold (fun key acc -> acc ^ key ^ "\n") scheme "" in
+    "{ " ^ values ^ " }"
+  ;;
+
+  module M = Sset
+
+  let show (set, t) =
+    let as_list = Sset.to_list set in
+    let forall = String.concat " " as_list in
+    let prefix =
+      "∀ "
+      ^ (match forall with
+         | "" -> "∅"
+         | s -> s)
+      ^ ". "
+    in
+    prefix ^ Type.show t
+  ;;
+
+  let poly : 'a -> t = fun x -> Sset.empty, x
+
+  (* typevars and type *)
+  let apply sub (tvs, ty) =
+    let open Type in
+    let tvs' = Sset.filter (fun k -> not (Smap.mem k sub)) tvs in
+    tvs', Type.apply sub ty
+  ;;
+
+  let instantiate (bounds, t) freshs =
+    let sub = Smap.of_list @@ List.combine (Sset.to_list bounds) freshs in
+    Type.apply sub t
+  ;;
+
+  let compare (_, a) (_, b) = compare a b
+  let len (vars, _) = Sset.cardinal vars
+
+  module Ops = struct
+    let ( -/ ) a b = M.diff a b
+  end
+end
+
+module Environment = struct
+  include Smap
+
+  type t = TypeScheme.t Smap.t
+
+  let show sub = Show.show TypeScheme.show Smap.string_values sub
+  let apply sub t = Smap.map (fun x -> TypeScheme.apply sub x) t
+
+  module Ops = struct
+    let ( +: ) env (var, ty) = add var ty env
+    let ( +:: ) env (var, ty) = add var (TypeScheme.poly ty) env
+  end
+end
+
+module type Algorithm = sig
+  type input
+  type output
+
+  val infer : Ast.t -> input -> output
+
+  val infer_many
+    :  Ast.t list
+    -> Environment.t (* TODO we must see if we can generalize this *)
+end
+
+module type W_type = sig
+    include Algorithm
+
+    val gen : Environment.t -> Type.t -> TypeScheme.t
+  end
+  with type input = Environment.t
+  with type output = Type.Substitution.t * Type.t
+
+module W : W_type = struct
+  type input = Environment.t
+  type output = Type.Substitution.t * Type.t
+
+  let c = ref 0
+
+  let fresh () =
+    let now = !c in
+    incr c;
+    Type.tyvar (string_of_int now)
+  ;;
+
+  let new_beta poly =
+    let amnt = TypeScheme.len poly in
+    List.init amnt (fun _ -> fresh ())
+  ;;
+
+  (* Environment.t -> Type.t -> TypeScheme.t *)
+  let gen env tau : TypeScheme.t =
+    let tau_vars = Type.free tau in
+    TypeScheme.M.filter (fun x -> not (Environment.mem x env)) tau_vars, tau
+  ;;
+
+  let rec infer t env =
+    let open Ast in
+    let module Ty = Type in
+    let module Sub = Type.Substitution in
+    let module Env = Environment in
+    let module Poly = TypeScheme in
+    let open Env.Ops in
+    let id = Smap.empty in
+    match t with
+    (* as afar as I can tell this is CON *)
+    | Bexp _ -> id, Ty.bool_type
+    | IntLit _ -> id, Ty.int_type
+    (* VAR *)
+    | Lit x ->
+      let tau =
+        try Env.find x env with
+        | Not_found -> raise (HM_exn (Undefined_variable x))
+      in
+      id, Poly.instantiate tau (new_beta tau)
+    | Lam (x, e) ->
+      let beta = fresh () in
+      let s1, t1 = infer e (env +:: (x, beta)) in
+      let s1_beta = Ty.apply s1 beta in
+      s1, Ty.lambda_type s1_beta t1
+    | App (e1, e2) ->
+      let s1, t1 = infer e1 env in
+      let s2, t2 = infer e2 (Env.apply s1 env) in
+      let beta = fresh () in
+      let s3 = Ty.unify (Ty.apply s2 t1) (Ty.lambda_type t2 beta) in
+      Sub.compose_all [ s3; s2; s1 ], Ty.apply s3 beta
+    | LetIn (x, e1, e2) ->
+      let s1, t1 = infer e1 env in
+      let s2, t2 = infer e2 (Env.apply s1 env +: (x, gen env t1)) in
+      Sub.compose_all [ s2; s1 ], t2
+    (* only functions are recursive *)
+    | Decl (f, e) ->
+      (match e with
+       | Lam (_, _) as l ->
+         let beta = fresh () in
+         let s1, t1 = infer l (env +:: (f, beta)) in
+         let s2 = Ty.unify beta t1 in
+         let s3 = Sub.compose_all [ s2; s1 ] in
+         s3, Ty.apply s3 beta
+       | otherwise ->
+         let s1, t1 = infer otherwise env in
+         s1, t1)
+    (* We only have arithmetic binops at the momment *)
+    | BinOp (lhs, _, rhs) -> failwith "wip"
+    | If (_, _, _) -> failwith "wip"
+  ;;
+
+  let infer_many terms =
+    let open Ast in
+    let go env' v =
+      match v with
+      | Decl (name, expr) as decl ->
+        (match infer decl env' with
+         | _, ty -> Environment.add name (gen env' ty) env'
+         | exception HM_exn exn ->
+           raise
+           @@ Failure (string_of_tc_error exn ^ " in " ^ name ^ " = " ^ Ast.show_term expr))
+      | _expr -> failwith "Invalid top level expression"
+    in
+    List.fold_left go Environment.empty terms
+  ;;
+end
+
+(*********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+*********************************************************************************)
+
 module LType = struct
   open Ppx_compare_lib.Builtin
 
@@ -131,13 +426,6 @@ module TC_types = struct
     ;;
   end
 
-  type typecheck_error =
-    | Undefined_variable of string
-    | Type_mismatch of string * string
-    | Infinite_type of string
-
-  exception HM_exn of typecheck_error
-
   (* inital var_id and inital constraints *)
   class infer ?(ii = 0) ?(cc = []) (ctx : context) =
     object (self)
@@ -201,11 +489,16 @@ module TC_types = struct
           let ps = TypeSet.empty, arg in
           let body = self#run_with_copy (SMap.add str ps) t in
           Typ ("lambda", [ arg; body ])
-        | App (t0, t1) ->
+        | App (t0, t1) as app ->
           let applicant = self#infer_private t0 in
           let arg = self#infer_private t1 in
           let ret = self#fresh in
-          self#constraint_ applicant (LType.lambda arg ret);
+          print_endline
+          @@ Ast.show_term app
+          ^ string_of_ltype applicant
+          ^ " should be "
+          ^ string_of_ltype (LType.lambda arg ret);
+          self#constraint_ (LType.lambda arg ret) applicant;
           ret
         | BinOp (t0, _, t1) ->
           (* op is currently not relevant *)
@@ -221,10 +514,32 @@ module TC_types = struct
           let decl_body = self#run_with_copy (SMap.add str ps) t0 in
           self#constraint_ name decl_body;
           decl_body
-        | LetIn (str, t0, t1) ->
+        | LetIn (str, t0, t1) as term ->
+          print_endline "term is: -----------------";
+          print_endline @@ show_term term;
+          (SMap.iter (fun key value ->
+             print_endline @@ key ^ " : " ^ string_of_polytype value))
+            context;
+          print_endline @@ "checking rhs: " ^ show_term t0;
           let rhs = self#infer_private t0 in
+          print_endline @@ "rhs: " ^ string_of_ltype rhs;
           let gen = self#generalize rhs in
+          print_endline
+          @@ "rhs generalized: "
+          ^ Ast.show_term t0
+          ^ ": "
+          ^ string_of_polytype gen;
           let expr_body = self#run_with_copy (SMap.add str gen) t1 in
+          print_endline
+          @@ "expr_body "
+          ^ Ast.show_term t1
+          ^ ": "
+          ^ string_of_ltype expr_body;
+          print_endline "-- CONSTRAINTS ---------------\n";
+          (List.iter (fun (l, r) ->
+             print_endline @@ string_of_ltype l ^ " <-> " ^ string_of_ltype r))
+            c;
+          print_endline "\n-- END -----------------------\n";
           expr_body
         | If (bexp, t0, t1) ->
           let if_ = self#infer_private bexp in
@@ -299,10 +614,10 @@ module TC_types = struct
     let run_solve : constraints -> (typecheck_error, subst) Either.t = solve TypeMap.empty
 
     let run_infer : infer -> Ast.term -> polytype inferred =
-      fun i typ ->
-      let type_, c = i#infer typ in
+      fun i term ->
+      let type_, c = i#infer term in
       match run_solve c with
-      | Left err -> Left (err, typ)
+      | Left err -> Left (err, term)
       | Right subst ->
         let infer_type = apply subst type_ in
         Right (i#generalize infer_type)
@@ -322,6 +637,13 @@ module TC_types = struct
       | Right v -> f v
     ;;
 
+    (* .
+      let x = 10
+      let main = let foo = (λx.λy . y x) x
+        in foo 10
+
+      should not typecheck but it does
+    *)
     let run_infer_module : infer -> Ast.term list -> (polytype * Ast.term) inferred list =
       fun i decls ->
       let ref_i = ref i in

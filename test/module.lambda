@@ -19,11 +19,12 @@ let bar = id 10
 
 let err = \x . let x = x - 10 in \y . x + y
 
-let t = \x. (\y. \x. x) x
+let t = \x. (\y. \x. y) x
 
-let term = 10 / 2
+let t2 = \x . (\y . \x . x + y) 3
 
-let inf = \x . inf (x + term)
+let foo = (λ x. (λ y . y x ))  
 
-let main =  inf 0
-    
+let main =
+    let const = λx. λy. x in
+    foo (const 10 foo) (const true)
