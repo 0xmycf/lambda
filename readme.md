@@ -26,13 +26,6 @@ it might be good starting point for a rabbit hole.
 
 ---
 
-The typechecker is heavily "inspired"[^1] by the blog post of [stimsina.com](https://blog.stimsina.com/post/implementing-a-hindley-milner-type-system-part-2):
-
-- [Part 1](https://blog.stimsina.com/post/implementing-a-hindley-milner-type-system-part-1)
-- [Part 2](https://blog.stimsina.com/post/implementing-a-hindley-milner-type-system-part-2)
-
-[^1]: I started to blindly copy half way through for different reasons. Ill rewrite it and organize it myself sometime.
-
 ## Why?
 
 - I wanted to learn how I parser generators such as [Menhir](https://gallium.inria.fr/~fpottier/menhir/)
@@ -40,7 +33,7 @@ The typechecker is heavily "inspired"[^1] by the blog post of [stimsina.com](htt
 - I wanted to implement [HM](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system) 
   for the longest time now.
 - Its fun.
-- Lots to learn.
+- Lots to learn (always).
 - Prepare for some other language I want to make for myself.
 - Ocaml is fun and I rarely use it.
 

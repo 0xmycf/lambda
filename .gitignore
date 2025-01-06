@@ -38,3 +38,5 @@ bin/parser.mli
 
 parser.messages
 bin/parser_messages.ml
+
+Session.vim
