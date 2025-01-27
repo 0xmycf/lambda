@@ -1,0 +1,14 @@
+
+let x = 1 + 2
+
+let y = x + 2
+
+let z = x + y
+
+let foo = λ x. (x + y) * 10
+
+#let error = λ this_is_a_bool. 
+#                if this_is_a_bool 
+## This line right here should fail
+#                then this_is_a_bool + 10 
+#                else 20

@@ -67,6 +67,12 @@ module Type = struct
   let int_type = TyCon ("int", [])
   let string_type = TyCon ("string", [])
   let lambda_type a b = TyCon ("lambda", [ a; b ])
+  let bin_op_type a b c = lambda_type a (lambda_type b c)
+  (**
+    Something like '1 + 3'
+    here (+) :: int -> int -> int
+   *)
+  let arith_bin_op_type = lambda_type int_type (lambda_type int_type int_type) 
 
   let rec apply sub t =
     match t with
@@ -262,16 +268,23 @@ module W : W_type = struct
        | otherwise ->
          let s1, t1 = infer otherwise env in
          s1, t1)
-    (* We only have arithmetic binops at the momment *)
-    | BinOp (_, _, _) -> failwith "wip"
+    (* We only have arithmetic (int's) binops at the moment *)
+    | BinOp (left, _op, right) ->
+        let s1, left_t = infer left env in
+        let s2, right_t = infer right (Env.apply s1 env) in
+        let beta = fresh () in
+        let s3 = Ty.(unify arith_bin_op_type (bin_op_type left_t right_t beta)) in
+        Sub.compose_all [ s3; s2; s1 ], Ty.apply s3 beta
     (* Could be modeled through combinators ! TODO make the parser modular to switch between different implementations *)
     | If (if_, then_, else_) ->
       let s1, if_t = infer if_ env in
-      let s2, then_t = infer then_ env in
-      let s3, else_t = infer else_ env in
       let s4 = Ty.unify Ty.bool_type if_t in
-      let s5 = Ty.unify then_t else_t in
-      Sub.compose_all [ s5; s4; s3; s2; s1 ], then_t
+      let env' = Env.apply s4 env in (* this makes sure that the if_ variable is recognised as such *)
+      let s2, then_t = infer then_ env' in
+      let s3, else_t = infer else_ env' in
+      let s5 = Ty.unify (Ty.apply s4 then_t) (Ty.apply s4 else_t) in
+      let sub = Sub.compose_all [ s5; s4; s3; s2; s1 ] in
+       sub, Ty.apply sub else_t
   ;;
 
   let infer_many terms =

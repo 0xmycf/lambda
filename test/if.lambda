@@ -18,7 +18,12 @@ let stress =
         then not (not a ) 
         else not a
 
-# let error =
+# let error_0 = λ enabled.
+#     if enabled
+#         then enabled
+#         else 10
+
+# let error_1 =
 #     if 10 then true 
 #           else true
 
